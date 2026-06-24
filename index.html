@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Controle de Estoque Profissional</title>
+    <!-- Biblioteca do PDF -->
+    <script src="https://cloudflare.com"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; background-color: #f9f9f9; }
+        .box { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .hidden { display: none; }
+        input, button { padding: 8px; margin: 5px 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+    </style>
+</head>
+<body>
+
+    <!-- TELA DE LOGIN -->
+    <div id="tela-login" class="box" style="max-width: 350px; margin: 100px auto;">
+        <h2 style="text-align: center;">Acessar Sistema</h2>
+        <input type="text" id="login-user" placeholder="Loja (loja1 ou loja2)" style="width: 93%;">
+        <input type="password" id="login-senha" placeholder="Senha" style="width: 93%;">
+        <button onclick="fazerLogin()" style="width: 100%; background: #007bff; color: white; border: none; cursor: pointer;">Entrar</button>
+    </div>
+
+    <!-- PAINEL PRINCIPAL -->
+    <div id="tela-painel" class="box hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <span>Loja ativa: <b id="nome-loja"></b></span>
+            <button onclick="deslogar()" style="background: #dc3545; color: white; border: none; cursor: pointer;">Sair</button>
+        </div>
+        
+        <h2>📦 Gerenciar Mercadorias</h2>
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <input type="text" id="p-nome" placeholder="Produto" style="flex: 1;">
+            <input type="number" id="p-qtd" placeholder="Qtd" style="width: 70px;">
+            <input type="number" id="p-preco" step="0.01" placeholder="Preço" style="width: 90px;">
+            <button onclick="adicionarProduto()" style="background: #28a745; color: white; border: none; cursor: pointer;">Adicionar</button>
+        </div>
+
+        <button onclick="baixarPDF()" style="background: #17a2b8; color: white; border: none; cursor: pointer; font-weight: bold; padding: 10px;">📄 Baixar Relatório em PDF</button>
+
+        <table>
+            <thead>
+                <tr style="background-color: #f2f2f2;"><th>Item</th><th>Preço</th><th>Estoque</th><th>Ações</th></tr>
+            </thead>
+            <tbody id="tabela-produtos"></tbody>
+        </table>
+    </div>
+
+    <script>
+        let usuarioLogado = localStorage.getItem('userLogado') || '';
+        const URL_API = 'http://localhost:5000/api';
+
+        function checarStatus() {
+            if (usuarioLogado) {
+                document.getElementById('tela-login').classList.add('hidden');
+                document.getElementById('tela-painel').classList.remove('hidden');
+                document.getElementById('nome-loja').innerText = usuarioLogado.toUpperCase();
+                carregarProdutos();
+            } else {
+                document.getElementById('tela-login').classList.remove('hidden');
+                document.getElementById('tela-painel').classList.add('hidden');
+            }
+        }
+
+       function fazerLogin() {
+            const user = document.getElementById('login-user').value;
+            const senha = document.getElementById('login-senha').value;
+
+            fetch(`${URL_API}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ usuario: user, senha: senha })
+            })
+            .then(res => {
+                // Se o servidor responder 403, a loja está inativa (travada por falta de pagamento)
+                if (res.status === 403) {
+                    return res.json().then(dados => { alert("🚨 " + dados.mensagem); throw new Error(); });
+                }
+                if (res.ok) return res.json();
+                throw new Error("Usuário ou senha incorretos");
+            })
+            .then(data => {
+                usuarioLogado = data.usuario;
+                localStorage.setItem('userLogado', usuarioLogado);
+                checarStatus();
+            })
+            .catch(err => { if(err.message) alert(err.message); });
+        }
+
+        function deslogar() {
+            localStorage.removeItem('userLogado');
+            usuarioLogado = '';
+            checarStatus();
+        }
+
+        let listaProdutosGlobais = [];
+        function carregarProdutos() {
+            fetch(`${URL_API}/produtos?usuario=${usuarioLogado}`)
+            .then(res => res.json())
+            .then(data => {
+                listaProdutosGlobais = data;
+                const tbody = document.getElementById('tabela-produtos');
+                tbody.innerHTML = '';
+                data.forEach(p => {
+                    const corFundo = p.quantidade <= 3 ? 'background-color: #ffcccc;' : '';
+                    tbody.innerHTML += `
+                        <tr style="${corFundo}">
+                            <td>${p.nome}</td>
+                            <td>R$ ${Number(p.preco).toFixed(2)}</td>
+                            <td><b>${p.quantidade}</b> ${p.quantidade <= 3 ? '(Baixo!)' : ''}</td>
+                            <td>
+                                <button onclick="alterarEstoque(${p.id}, ${p.quantidade - 1})">-</button>
+                                <button onclick="alterarEstoque(${p.id}, ${p.quantidade + 1})">+</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            });
+        }
+
+        function adicionarProduto() {
+            const nome = document.getElementById('p-nome').value;
+            const quantidade = document.getElementById('p-qtd').value;
+            const preco = document.getElementById('p-preco').value;
+
+            if(!nome || !quantidade || !preco) return alert("Preencha tudo!");
+
+            fetch(`${URL_API}/produtos`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nome, quantidade, preco, usuario: usuarioLogado })
+            }).then(() => {
+                document.getElementById('p-nome').value = '';
+                document.getElementById('p-qtd').value = '';
+                document.getElementById('p-preco').value = '';
+                carregarProdutos();
+            });
+        }
+
+        function alterarEstoque(id, novaQtd) {
+            if (novaQtd < 0) return;
+            fetch(`${URL_API}/produtos/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ quantidade: novaQtd, usuario: usuarioLogado })
+            }).then(() => carregarProdutos());
+        }
+
+        function baixarPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.setFont("Helvetica", "bold");
+            doc.text("RELATÓRIO DE ESTOQUE - " + usuarioLogado.toUpperCase(), 14, 20);
+            doc.setFont("Helvetica", "normal");
+            doc.text("Data: " + new Date().toLocaleDateString('pt-BR'), 14, 28);
+            let y = 45;
+            listaProdutosGlobais.forEach((p, i) => {
+                doc.text((i+1) + ". " + p.nome + " | Qtd: " + p.quantidade + " | R$ " + Number(p.preco).toFixed(2), 14, y);
+                y += 10;
+            });
+            doc.save("estoque-" + usuarioLogado + ".pdf");
+        }
+
+        // Executa ao abrir a página
+        checarStatus();
+    </script>
+</body>
+</html>
