@@ -7,14 +7,14 @@
     <!-- Biblioteca do PDF -->
     <script src="https://cloudflare.com"></script>
     
-    <!-- CONEXÃO DO FIREBASE (SEUS DADOS REAIS JÁ INJETADOS!) -->
+    <!-- CONEXÃO DO FIREBASE -->
     <script type="module">
         import { initializeApp } from "https://gstatic.com";
         import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://gstatic.com";
 
         const firebaseConfig = {
             apiKey: "AIzaSyD8iSQDQ27vwtd0vOPSsi8AJ3rTykIu-1I",
-            authDomain: "meu-estoque-saas.firebaseapp.com",
+            authDomain: "://firebaseapp.com",
             projectId: "meu-estoque-saas",
             storageBucket: "meu-estoque-saas.firebasestorage.app",
             messagingSenderId: "865191014496",
@@ -23,7 +23,7 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        window.db = db; // Disponibiliza o banco para as funções abaixo
+        window.db = db;
     </script>
 
     <style>
@@ -63,7 +63,7 @@
     <!-- TELA DE CADASTRO AUTÔNOMO (7 DIAS TRIAL) -->
     <div id="tela-cadastro" class="box hidden" style="margin-top: 30px;">
         <h2>Criar Conta Grátis (7 dias)</h2>
-        <input type="text" id="cad-user" placeholder="Nome da sua Loja (ex: lojadasuamaria)">
+        <input type="text" id="cad-user" placeholder="Nome da sua Loja (ex: lojamaria)">
         <input type="password" id="cad-senha" placeholder="Crie uma Senha">
         
         <label style="font-weight: bold; font-size: 14px; color: #555;">Escolha seu plano após o teste:</label>
@@ -86,7 +86,6 @@
             <h3 style="margin: 0 0 10px 0; color: #28a745;">Pague com Pix Seguro</h3>
             <p style="font-weight: bold; font-size: 18px; margin: 5px 0;" id="txt-preco-plano">R$ 59,90</p>
             
-            <!-- Simulador de QR Code Visual -->
             <div style="width: 150px; height: 150px; background: #ddd; margin: 15px auto; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; border: 1px solid #aaa;">
                 [ QR CODE DO PIX ]
             </div>
@@ -150,7 +149,6 @@
                     const dadosLoja = docSnap.data();
                     const hoje = new Date().toISOString().split('T')[0];
 
-                    // TRAVA DE DATA: Se hoje passou do vencimento, vai para a tela do Pix
                     if (hoje > dadosLoja.vencimento) {
                         document.getElementById('txt-preco-plano').innerText = precosPlanos[dadosLoja.plano];
                         mudarTela('tela-login', 'tela-bloqueio');
@@ -158,7 +156,6 @@
                         return;
                     }
 
-                    // Se estiver em dia, abre o painel
                     document.getElementById('tela-login').classList.add('hidden');
                     document.getElementById('tela-bloqueio').classList.add('hidden');
                     document.getElementById('tela-painel').classList.remove('hidden');
@@ -172,7 +169,7 @@
                     deslogar();
                 }
             } catch (e) {
-                alert("Erro ao conectar com o servidor.");
+                console.error(e);
             }
         }
 
@@ -183,3 +180,9 @@
 
             if(!user || !senha) return alert("Preencha todos os campos!");
 
+            try {
+                const docRef = doc(window.db, "lojas", user);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    return alert("Este nome de loja já está sendo usado. Escolha outro!");
