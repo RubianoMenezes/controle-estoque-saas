@@ -155,10 +155,12 @@
         const limitesPlanos = { "bronze": 30, "prata": 150, "ouro": 99999 };
         const precosPlanos = { "bronze": "R$ 34,90", "prata": "R$ 59,90", "ouro": "R$ 99,90" };
 
-        window.mudarTela = function(esconder, mostrar) {
-            document.getElementById(esconder).classList.add('hidden');
-            document.getElementById(mostrar).classList.remove('hidden');
-        }
+       window.mudarTela = function(esconder, mostrar) {
+    document.getElementById(esconder).style.display = 'none';
+    document.getElementById(mostrar).style.display = 'block';
+    document.getElementById(mostrar).classList.remove('hidden');
+}
+
 
         window.checarStatus = async function() {
             if (!usuarioLogado) {
