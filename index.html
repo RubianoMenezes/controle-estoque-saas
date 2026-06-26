@@ -10,7 +10,7 @@
     <!-- CONEXÃO DO FIREBASE -->
     <script type="module">
         import { initializeApp } from "https://gstatic.com";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://gstatic.com";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion } from "https://gstatic.com";
 
         const firebaseConfig = {
             apiKey: "AIzaSyD8iSQDQ27vwtd0vOPSsi8AJ3rTykIu-1I",
@@ -32,8 +32,8 @@
         .box { background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin-bottom: 20px; }
         .hidden { display: none; }
         h2 { margin-top: 0; color: #222; text-align: center; font-size: 22px; }
-        input, select, button { width: 100%; padding: 14px; margin: 8px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; outline: none; }
-        input:focus, select:focus { border-color: #007bff; }
+        input, select, button, textarea { width: 100%; padding: 14px; margin: 8px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; outline: none; }
+        input:focus, select:focus, textarea:focus { border-color: #007bff; }
         button { background: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
         button:active { transform: scale(0.98); }
         .btn-add { background: #28a745; }
@@ -47,6 +47,8 @@
         .alert-row { background-color: #ffe6e6 !important; }
         .pix-box { text-align: center; border: 2px dashed #28a745; padding: 15px; border-radius: 8px; background: #f9fff9; margin-top: 15px; }
         .link-toggle { text-align: center; margin-top: 15px; color: #007bff; cursor: pointer; font-weight: 500; }
+        .suporte-box { background: #eef9ff; border: 1px solid #bce1ff; padding: 15px; border-radius: 8px; margin-top: 20px; text-align: center; }
+        .btn-wpp { background: #25d366; color: white; text-decoration: none; display: block; padding: 12px; border-radius: 8px; font-weight: bold; margin-top: 5px; text-align: center; }
     </style>
 </head>
 <body>
@@ -92,10 +94,16 @@
             
             <button onclick="copiarPix()" style="background: #28a745; font-size: 15px; padding: 10px;">📋 Copiar Código Pix Copia e Cola</button>
         </div>
+
+        <div class="suporte-box">
+            <p style="margin: 0; font-size: 14px; font-weight: 500;">Dúvidas ou problemas com o pagamento?</p>
+            <a href="https://wa.me" target="_blank" class="btn-wpp">💬 Chamar Suporte no WhatsApp</a>
+        </div>
+
         <button onclick="deslogar()" class="btn-pdf" style="background: #6c757d;">Voltar para o Login</button>
     </div>
 
-    <!-- PAINEL PRINCIPAL (RESPONSIVO CELULAR) -->
+    <!-- PAINEL PRINCIPAL -->
     <div id="tela-painel" class="box hidden">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
             <span>Loja: <b id="nome-loja" style="color: #007bff; text-transform: uppercase;"></b></span>
@@ -122,19 +130,37 @@
                 <tbody id="tabela-produtos"></tbody>
             </table>
         </div>
+
+        <!-- CENTRAL DE AJUDA -->
+        <div style="margin-top: 40px; border-top: 2px dashed #eee; padding-top: 20px;">
+            <h3 style="font-size: 18px; margin-bottom: 10px; color: #444; text-align: center;">🛠️ Central de Ajuda</h3>
+            
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; margin-bottom: 15px;">
+                <label style="font-size: 14px; font-weight: bold; color: #555;">Envie uma Sugestão de Melhoria:</label>
+                <textarea id="txt-sugestao" rows="2" placeholder="O que podemos melhorar no sistema?" style="resize: none;"></textarea>
+                <button onclick="enviarSugestao()" style="background: #6c757d; padding: 8px; font-size: 14px; margin: 5px 0 0 0;">Enviar Sugestão</button>
+            </div>
+
+            <div class="suporte-box" style="margin: 0;">
+                <p style="margin: 0; font-size: 14px; font-weight: 500;">Precisa de ajuda ou encontrou algum problema?</p>
+                <a href="https://wa.me" target="_blank" class="btn-wpp">💬 Falar com Suporte Técnico</a>
+            </div>
+        </div>
     </div>
 
-    <script>
+    <script type="module">
+        import { doc, getDoc, setDoc, updateDoc, arrayUnion } from "https://gstatic.com";
+
         let usuarioLogado = localStorage.getItem('userLogado') || '';
         const limitesPlanos = { "bronze": 30, "prata": 150, "ouro": 99999 };
         const precosPlanos = { "bronze": "R$ 34,90", "prata": "R$ 59,90", "ouro": "R$ 99,90" };
 
-        function mudarTela(esconder, mostrar) {
+        window.mudarTela = function(esconder, mostrar) {
             document.getElementById(esconder).classList.add('hidden');
             document.getElementById(mostrar).classList.remove('hidden');
         }
 
-        async function checarStatus() {
+        window.checarStatus = async function() {
             if (!usuarioLogado) {
                 mudarTela('tela-painel', 'tela-login');
                 document.getElementById('tela-bloqueio').classList.add('hidden');
@@ -147,42 +173,3 @@
 
                 if (docSnap.exists()) {
                     const dadosLoja = docSnap.data();
-                    const hoje = new Date().toISOString().split('T')[0];
-
-                    if (hoje > dadosLoja.vencimento) {
-                        document.getElementById('txt-preco-plano').innerText = precosPlanos[dadosLoja.plano];
-                        mudarTela('tela-login', 'tela-bloqueio');
-                        document.getElementById('tela-painel').classList.add('hidden');
-                        return;
-                    }
-
-                    document.getElementById('tela-login').classList.add('hidden');
-                    document.getElementById('tela-bloqueio').classList.add('hidden');
-                    document.getElementById('tela-painel').classList.remove('hidden');
-                    document.getElementById('nome-loja').innerText = usuarioLogado;
-                    
-                    const limiteTxt = dadosLoja.plano === 'ouro' ? 'Ilimitado' : limitesPlanos[dadosLoja.plano] + ' itens';
-                    document.getElementById('txt-limite-plano').innerText = `Plano ${dadosLoja.plano.toUpperCase()} (Limite: ${limiteTxt})`;
-                    
-                    renderizarTabela(dadosLoja.produtos || []);
-                } else {
-                    deslogar();
-                }
-            } catch (e) {
-                console.error(e);
-            }
-        }
-
-        async function registrarLoja() {
-            const user = document.getElementById('cad-user').value.toLowerCase().replace(/\s+/g, '').trim();
-            const senha = document.getElementById('cad-senha').value;
-            const plano = document.getElementById('cad-plano').value;
-
-            if(!user || !senha) return alert("Preencha todos os campos!");
-
-            try {
-                const docRef = doc(window.db, "lojas", user);
-                const docSnap = await getDoc(docRef);
-
-                if (docSnap.exists()) {
-                    return alert("Este nome de loja já está sendo usado. Escolha outro!");
