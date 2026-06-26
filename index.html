@@ -173,3 +173,10 @@
 
                 if (docSnap.exists()) {
                     const dadosLoja = docSnap.data();
+                }
+            } catch (error) {
+                console.error("Erro ao verificar status da loja:", error);
+            }
+        }
+    </script>
+</body>
